@@ -5,3 +5,7 @@ Einfach alle Rechnungen von Statdmobil in ein verzeichnis speichern und dann das
 ```
 stadtmobil_parser.pl ~/MYDIR/
 ```
+
+Voraussetungen:
+  - Linux / Perl
+  - pdftotext
