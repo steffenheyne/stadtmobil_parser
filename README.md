@@ -3,5 +3,5 @@ Stadtmobil Rechnungen (pdf) in Tabelle (tsv) umwandeln für eigene Statistiken  
 
 Einfach alle Rechnungen von Statdmobil in ein verzeichnis speichern und dann das skript folgendermaßen aufrufen:
 ```
-parse
+stadtmobil_parser.pl ~/MYDIR/
 ```
