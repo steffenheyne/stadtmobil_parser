@@ -9,54 +9,61 @@ my $inv_dir = $ARGV[0];
 my $bidx=0;
 
 open(OUT,">","alle_buchungen.tsv");
-print OUT join("\t",("idx","Teilnehmer","Stadt","Station","Auto","Jahr","Monat","Begin","Ende","Stunden","Km","Grundpreis","Zeitpreis","Km-Preis","Gesamtpreis","Rechnungsdatum"))."\n";
+print OUT join("\t",("idx","Teilnehmer","Stadt","Station","Auto","Jahr","Monat","von","TagA","Anfang","bis","TagE","Ende","Stunden","Km","Grundpreis","Zeitpreis","Km-Preis","Gesamtpreis","Rechnungsdatum","Datei"))."\n";
+
 foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 	my $inv_text = readpipe("pdftotext -layout $file -");
 	$inv_text =~ s/\n/§/g;
 	
 	$inv_text =~ /Teilnehmer-Nr\.\s+(\d+)/g;
 	my $tnr= $1;
-	$inv_text =~ /\G.*?Rechnungsdatum\s+(\S+)*?§/g;
+	$inv_text =~ /\G.*?Rechnungsdatum\s+(\S+)\s*§/g;
 	my $date= $1;
-	
 	print "\n\n".$file," TNr. ",$tnr," Datum ",$date,"\n";
+
 	while ($inv_text =~ /([^§]+\s\S+\s+USt\s+Netto)/g){
 		my $start = $-[1];
-		$inv_text =~ /(\G.*?Fahrtkosten.*?)§/g;
-		my $end = $+[1];
+		my $end = -1;
+		if ($inv_text =~ /(\G.*?Fahrtkosten.*?)§/g){
+			$end = $+[1];}
+		elsif ($inv_text =~ /(\G.*?Tankkostenerstattung.*?)§/g){
+			$end = $+[1];
+			print "Nur Tankkostenbuchung! - Skip!";
+			next;
+		}
 		my $buchung = substr($inv_text,$start,$end-$start+1);
 		$buchung =~ s/§/\n/g;
 		$bidx++;
 		print "\n--> Buchung: $bidx\n";
-		print $buchung,"\n";
+		print "### Erkannter Buchungstext - Orginal: >>>\n",$buchung,"\n >>> Ende Original ####################\n\n";
 		
 		$buchung =~ /^(.*?),/;
 		my $car = $1;
-		print "auto :",$car,":\n";
+		print "Auto        : ",$car,"\n";
 		$buchung =~ /,.([^,]+),.([^,]+\S)\s+USt/;
 		my $city = $1;
-		print "Stadt :",$city,":\n";
+		print "Stadt       : ",$city,":\n";
 		
 		my $station = $2;
-		print "Station :",$station,":\n";
+		print "Station     : ",$station,"\n";
 		
 		$buchung =~ /von ([\d.]+), ([\d:]+)/;
 		my $date_start = $1."-".$2;
-		print "Zeitraum von ".$date_start,"\n";
+		print "Zeitraum von: ".$date_start,"\n";
 		
 		my $gp=0;
 		if ($buchung =~ /Grundgebühr.*?\%.*?€\s+([\d,]+) €/){
 			$gp=$1; $gp=~s/,/./;
 		}
-		print "grundpreis ",$gp," Euro\n";
+		print "Grundpreis  : ",$gp," Euro\n";
 		$buchung =~ /bis ([\d.]+), ([\d:]+)/;
 		my $date_end = $1."-".$2;
-		print "Zeitraum bis ".$date_end,"\n";
+		print "Zeitraum bis: ".$date_end,"\n";
 		my $kmt = 0;
 		my $km = 0;
 		if ($buchung =~ /Km-Tarif(.*)\s+[\d,]+\%.*?€\s+([\d,]+) €/){
 			my $tmp = $1;
-			print "TEST ",$tmp,"\n";
+			print "case1: ",$tmp,"\n";
 			$kmt=$2; 
 			$kmt=~s/,/./;
 			
@@ -65,7 +72,7 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 			}
 		} elsif ($buchung =~ /Km-Tarif.*\n\s+(.*)\s+[\d,]+\%.*?€\s+([\d,]+) €/){
 			my $tmp = $1;
-			print "TEST NEW",$tmp,"\n";
+			print "case2: ",$tmp,"\n";
 			$kmt=$2; 
 			$kmt=~s/,/./;
 			
@@ -74,16 +81,23 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 			}
 		}
 		
-		print "km :",$km,"\n";
-		print "Km preis :",$kmt," Euro\n";
+		print "km         : ",$km,"\n";
+		print "Km Preis   : ",$kmt," Euro\n";
 		my $zt=0;
+		my $gutschrift=0;
 		if ($buchung =~ /Zeit-Tarif.*?\%\s+[\d,]+.€\s+([\d,]+) €/){
 			$zt=$1; $zt=~s/,/./;
 		} elsif ($buchung =~ /Zeit-Tarif.*\n\s+.*\s+[\d,]+\%.*?€\s+([\d,]+) €/){
 			$zt=$1;$zt=~s/,/./;
 		}
-		print "Zeit preis ",$zt," Euro\n";
-		print "gesamtpreis :",$gp+$kmt+$zt,"\n";
+		
+		if ($buchung =~ /Zeit-Tarif.*Gutschrift.*?\%\s+[-\d,]+.€\s+([-\d,]+) €/){
+			$gutschrift = $1; $gutschrift =~s/,/./;
+		}
+		my $gesamtpreis = $gp+$kmt+$zt+$gutschrift;
+		print "Zeitpreis  : ",$zt," Euro\n";
+		print "Gutschrift : ",$gutschrift," Euro \n";
+		print "Gesamtpreis: ",$gesamtpreis," Euro\n";
 		
 		my $t1 = Time::Piece->strptime($date_start,"%d.%m.%Y-%H:%M");
 		print "time ",$t1,"\n";
@@ -112,17 +126,16 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 			$car = $3;
 			$km = $8;
 			print "time ",$4."-".$5,"\n";
-		my $ti1 = Time::Piece->strptime($4."-".$5,"%d.%m.%y-%H:%M");
-		print "time ",$ti1,"\n";
-		my $ti2 = Time::Piece->strptime($6."-".$7,"%d.%m.%y-%H:%M");
-		print "time ",$ti2,"\n";
-		$zeitraum = sprintf("%.1f",($ti2-$ti1)/3600);
+			my $ti1 = Time::Piece->strptime($4."-".$5,"%d.%m.%y-%H:%M");
+			print "time ",$ti1,"\n";
+			my $ti2 = Time::Piece->strptime($6."-".$7,"%d.%m.%y-%H:%M");
+			print "time ",$ti2,"\n";
+			$zeitraum = sprintf("%.1f",($ti2-$ti1)/3600);
 		
 			print "stadt :".$city.": ",$station," ",$car," ",$ti1," ",$ti2," ",$zeitraum," ",$km,"\n";
-			
 		}
 		
-		print OUT join("\t",($bidx,$tnr,$city,$station,$car,$t1->year,$t1->fullmonth,$t1,$t2,$zeitraum,$km,$gp,$zt,$kmt,$gp+$kmt+$zt,$date))."\n";
+		print OUT join("\t",($bidx,$tnr,$city,$station,$car,$t1->year,$t1->fullmonth,$t1->dmy("."),$t1->wdayname,$t1->hms,$t2->dmy("."),$t2->wdayname,$t2->hms,$zeitraum,$km,$gp,$zt,$kmt,$gesamtpreis,$date,$file))."\n";
 	}
 }
 
