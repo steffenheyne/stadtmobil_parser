@@ -24,9 +24,13 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 	while ($inv_text =~ /([^§]+\s\S+\s+USt\s+Netto)/g){
 		my $start = $-[1];
 		my $end = -1;
-		if ($inv_text =~ /(\G.*?Fahrtkosten.*?)§/g){
+		if ($inv_text =~ /(\G.*?Fahrtgutschrift.Schnupperangebot.*?)§/){
+			print "Schnupperangebot Rabatt";
+			next;		
+		}
+		elsif ($inv_text =~ /(\G.*?Fahrtkosten.*?)§/g){
 			$end = $+[1];}
-		elsif ($inv_text =~ /(\G.*?Tankkostenerstattung.*?)§/g){
+		elsif ($inv_text =~ /(\G.*?Tankkostenerstattung.*?)§/){
 			$end = $+[1];
 			print "Nur Tankkostenbuchung! - Skip!";
 			next;
@@ -120,6 +124,7 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 			$preis=~s/,/./;
 			$kmt=$preis/2;
 			$zt=$preis/2;
+			$gesamtpreis=$kmt+$zt;
 			$t1 =~ /^([^\,]+?), (\S+).*?(\S+)\, ([\d\.]+).*?([\d:]+).*?([\d\.]+).*?([\d:]+) Uhr\,\s+([\d]+)/;
 			$city = $1;
 			$station = $2;
