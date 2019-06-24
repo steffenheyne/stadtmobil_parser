@@ -30,7 +30,7 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 		}
 		elsif ($inv_text =~ /(\G.*?Fahrtkosten.*?)§/g){
 			$end = $+[1];}
-		elsif ($inv_text =~ /(\G.*?Tankkostenerstattung.*?)§/){
+		elsif ($inv_text =~ /(\G.*?Tankkostenerstattung.*?)§/g){
 			$end = $+[1];
 			print "Nur Tankkostenbuchung! - Skip!";
 			next;
