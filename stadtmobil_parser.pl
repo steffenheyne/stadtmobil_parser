@@ -9,7 +9,7 @@ my $inv_dir = $ARGV[0];
 my $bidx=0;
 
 open(OUT,">","alle_buchungen.tsv");
-print OUT join("\t",("idx","Teilnehmer","Stadt","Station","Auto","Jahr","Monat","von","TagA","Anfang","bis","TagE","Ende","Stunden","Km","Grundpreis","Zeitpreis","Km-Preis","Gesamtpreis","Rechnungsdatum","Datei"))."\n";
+print OUT join("\t",("idx","Teilnehmer","Stadt","Station","Auto","Jahr","Monat","von","TagA","Anfang","bis","TagE","Ende","Stunden","Km","Grundpreis","Zeitpreis","Km-Preis","Gutschrift","Gesamtpreis","Rechnungsdatum","Datei"))."\n";
 
 foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 	my $inv_text = readpipe("pdftotext -layout $file -");
@@ -38,7 +38,7 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 		my $buchung = substr($inv_text,$start,$end-$start+1);
 		$buchung =~ s/§/\n/g;
 		$bidx++;
-		print "\n--> Buchung: $bidx\n";
+		print "\n--> Buchung: $bidx"," (",$file,")\n";
 		print "### Erkannter Buchungstext - Orginal: >>>\n",$buchung,"\n >>> Ende Original ####################\n\n";
 		
 		$buchung =~ /^(.*?),/;
@@ -65,37 +65,46 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 		print "Zeitraum bis: ".$date_end,"\n";
 		my $kmt = 0;
 		my $km = 0;
+
 		if ($buchung =~ /Km-Tarif(.*)\s+[\d,]+\%.*?€\s+([\d,]+) €/){
 			my $tmp = $1;
 			print "case1: ",$tmp,"\n";
 			$kmt=$2; 
 			$kmt=~s/,/./;
 			
-			while ($tmp=~/([\d]+) km/g){
-				$km+=$1;
+			while ($tmp=~/([\d\.]+) km/g){
+				my $tmp_km = $1;
+				$tmp_km =~ s/\.//;
+				$km+=$tmp_km;
+				print "km: ",$tmp_km," ",$km,"\n";
 			}
 		} elsif ($buchung =~ /Km-Tarif.*\n\s+(.*)\s+[\d,]+\%.*?€\s+([\d,]+) €/){
+			## pdftotext gibt eine new line nach (20% Rabatt) aus. "Km-Tarif (20% Rabatt)\n.. 19 km für € 0,168."
 			my $tmp = $1;
 			print "case2: ",$tmp,"\n";
 			$kmt=$2; 
 			$kmt=~s/,/./;
 			
-			while ($tmp=~/([\d]+) km/g){
-				$km+=$1;
+			while ($tmp=~/([\d\.]+) km/g){
+				my $tmp_km = $1;
+				$tmp_km =~ s/\.//;
+				$km+=$tmp_km;
+				print "km: ",$tmp_km," ",$km,"\n";
 			}
 		}
-		
 		print "km         : ",$km,"\n";
 		print "Km Preis   : ",$kmt," Euro\n";
 		my $zt=0;
-		my $gutschrift=0;
-		if ($buchung =~ /Zeit-Tarif.*?\%\s+[\d,]+.€\s+([\d,]+) €/){
-			$zt=$1; $zt=~s/,/./;
-		} elsif ($buchung =~ /Zeit-Tarif.*\n\s+.*\s+[\d,]+\%.*?€\s+([\d,]+) €/){
-			$zt=$1;$zt=~s/,/./;
+		my $gutschrift=0.0;
+		if ($buchung =~ /Zeit-Tarif.*\n{0,1}.*?\%\s+[\d,]+.€\s+([\d,]+) €/){
+		## pdftotext gibt eine new line nach (20% Rabatt) aus. "Zeit-Tarif (20% Rabatt)\n..."
+		## deswegen der teil ".*\n{0,1}" 
+			$zt=$1;
+			$zt=~s/,/./;
 		}
-		
-		if ($buchung =~ /Zeit-Tarif.*Gutschrift.*?\%\s+[-\d,]+.€\s+([-\d,]+) €/){
+
+		## Gutschrift für vorzeitige Rückgabe
+		if ($buchung =~ /Zeit-Tarif.*Gutschrift.*?[\d,]+\%\s+[-\d,]+.€\s+([-\d,]+) €/){
 			$gutschrift = $1; $gutschrift =~s/,/./;
 		}
 		my $gesamtpreis = $gp+$kmt+$zt+$gutschrift;
@@ -140,7 +149,7 @@ foreach my $file (<$inv_dir/*tadtmobil*.pdf>){
 			print "stadt :".$city.": ",$station," ",$car," ",$ti1," ",$ti2," ",$zeitraum," ",$km,"\n";
 		}
 		
-		print OUT join("\t",($bidx,$tnr,$city,$station,$car,$t1->year,$t1->fullmonth,$t1->dmy("."),$t1->wdayname,$t1->hms,$t2->dmy("."),$t2->wdayname,$t2->hms,$zeitraum,$km,$gp,$zt,$kmt,$gesamtpreis,$date,$file))."\n";
+		print OUT join("\t",($bidx,$tnr,$city,$station,$car,$t1->year,$t1->fullmonth,$t1->dmy("."),$t1->wdayname,$t1->hms,$t2->dmy("."),$t2->wdayname,$t2->hms,$zeitraum,$km,$gp,$zt,$kmt,$gutschrift,$gesamtpreis,$date,$file))."\n";
 	}
 }
 
